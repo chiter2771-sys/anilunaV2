@@ -7,7 +7,8 @@ import { useParams } from "next/navigation";
 
 export default function AnimePage() {
   const { id } = useParams();
-  const [anime, setAnime] = useState<any>(null);
+    const [variants, setVariants] = useState<any[]>([]);
+  const [selected, setSelected] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -18,22 +19,28 @@ export default function AnimePage() {
   }, [id]);
 
   useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_KODIK_API_KEY;
-    if (!apiKey || !id) return;
-    fetch(`https://kodikapi.com/search?token=${apiKey}&shikimori_id=${id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setAnime(data.results?.[0] || null);
+    const load = async () => {
+      if (!id) return;
+      try {
+        setLoading(true);
+        const res = await fetch(`/api/kodik?type=search&shikimori_id=${id}`);
+        const data: any = await res.json();
+        if (!res.ok || data?.error) throw new Error(data?.error || "Ошибка загрузки тайтла");
+        setVariants(data?.results || []);
+      } catch (e: any) {
+        setError(e?.message || "Ошибка сети");
+      } finally {
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      }
+    };
+    load();
   }, [id]);
 
-  const anime = variants[selected] || variants[0] || null;
-  const title = anime?.title || anime?.material_data?.title || "Аниме";
-  const description = anime?.material_data?.description || "Описание отсутствует.";
-  const playerUrl = anime?.link ? (anime.link.startsWith("//") ? `https:${anime.link}` : anime.link) : "";
-  const episodes = anime?.episodes_count || anime?.material_data?.episodes_total || anime?.material_data?.episodes_aired || 0;
+  const currentAnime = variants[selected] || variants[0] || null;
+  const title = currentAnime?.title || currentAnime?.material_data?.title || "Аниме";
+  const description = currentAnime?.material_data?.description || "Описание отсутствует.";
+  const playerUrl = currentAnime?.link ? (currentAnime.link.startsWith("//") ? `https:${currentAnime.link}` : currentAnime.link) : "";
+  const episodes = currentAnime?.episodes_count || currentAnime?.material_data?.episodes_total || currentAnime?.material_data?.episodes_aired || 0;
 
   const seasons = useMemo(() => Array.from(new Set(variants.map((v: any) => v?.season).filter(Boolean))), [variants]);
 
@@ -56,21 +63,21 @@ export default function AnimePage() {
 
       <section className="grid lg:grid-cols-[280px_1fr] gap-6 mt-6">
         <div>
-          {anime?.material_data?.poster_url ? <img src={anime.material_data.poster_url} alt={title} className="w-full rounded-xl border border-moon-800/50" /> : null}
+          {currentAnime?.material_data?.poster_url ? <img src={currentAnime.material_data.poster_url} alt={title} className="w-full rounded-xl border border-moon-800/50" /> : null}
           <button onClick={toggleSaved} className="mt-3 w-full rounded-xl bg-moon-800 hover:bg-moon-700 transition-colors px-4 py-2">{saved ? "★ В избранном" : "☆ Смотреть позже / В избранное"}</button>
         </div>
         <div>
           <h1 className="text-3xl font-bold text-lunar-glow">{title}</h1>
           <p className="text-moon-300 mt-3">{description}</p>
-          <p className="text-moon-300 mt-3">Статус: {anime?.material_data?.anime_status || "—"} · Рейтинг: {anime?.material_data?.shikimori_rating || anime?.material_data?.score || "—"}</p>
-          <div className="flex flex-wrap gap-2 mt-3">{(anime?.material_data?.anime_genre || []).map((g: string) => <span key={g} className="text-xs bg-moon-800/60 rounded-full px-2 py-1">{g}</span>)}</div>
+          <p className="text-moon-300 mt-3">Статус: {currentAnime?.material_data?.anime_status || "—"} · Рейтинг: {currentAnime?.material_data?.shikimori_rating || currentAnime?.material_data?.score || "—"}</p>
+          <div className="flex flex-wrap gap-2 mt-3">{(currentAnime?.material_data?.anime_genre || []).map((g: string) => <span key={g} className="text-xs bg-moon-800/60 rounded-full px-2 py-1">{g}</span>)}</div>
 
           {variants.length > 1 ? (
             <div className="mt-5 grid md:grid-cols-2 gap-3">
               <select value={selected} onChange={(e) => setSelected(Number(e.target.value))} className="rounded-xl bg-moon-900/70 border border-moon-700/50 px-3 py-2">
                 {variants.map((v: any, idx: number) => <option key={`${v?.id}_${idx}`} value={idx}>{v?.translation?.title || v?.title || `Вариант ${idx + 1}`}</option>)}
               </select>
-              <select className="rounded-xl bg-moon-900/70 border border-moon-700/50 px-3 py-2" value={anime?.season || ""} onChange={(e) => {
+              <select className="rounded-xl bg-moon-900/70 border border-moon-700/50 px-3 py-2" value={currentAnime?.season || ""} onChange={(e) => {
                 const idx = variants.findIndex((v: any) => String(v?.season || "") === e.target.value);
                 if (idx >= 0) setSelected(idx);
               }}>
