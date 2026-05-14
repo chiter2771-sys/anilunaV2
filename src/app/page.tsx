@@ -24,6 +24,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const apiKey = process.env.NEXT_PUBLIC_KODIK_API_KEY;
+
   useEffect(() => {
     (async () => {
       try {
