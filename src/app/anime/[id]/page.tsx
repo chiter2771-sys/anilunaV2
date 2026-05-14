@@ -7,9 +7,7 @@ import { useParams } from "next/navigation";
 
 export default function AnimePage() {
   const { id } = useParams();
-  const apiKey = process.env.NEXT_PUBLIC_KODIK_API_KEY;
-  const [variants, setVariants] = useState<any[]>([]);
-  const [selected, setSelected] = useState(0);
+  const [anime, setAnime] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -20,22 +18,16 @@ export default function AnimePage() {
   }, [id]);
 
   useEffect(() => {
-    const load = async () => {
-      if (!apiKey || !id) return;
-      try {
-        setLoading(true);
-        const res = await fetch(`https://kodikapi.com/search?token=${apiKey}&shikimori_id=${id}`);
-        const data: any = await res.json();
-        if (!res.ok || data?.error) throw new Error(data?.error || "Ошибка загрузки тайтла");
-        setVariants(data?.results || []);
-      } catch (e: any) {
-        setError(e?.message || "Ошибка сети");
-      } finally {
+    const apiKey = process.env.NEXT_PUBLIC_KODIK_API_KEY;
+    if (!apiKey || !id) return;
+    fetch(`https://kodikapi.com/search?token=${apiKey}&shikimori_id=${id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setAnime(data.results?.[0] || null);
         setLoading(false);
-      }
-    };
-    load();
-  }, [apiKey, id]);
+      })
+      .catch(() => setLoading(false));
+  }, [id]);
 
   const anime = variants[selected] || variants[0] || null;
   const title = anime?.title || anime?.material_data?.title || "Аниме";
