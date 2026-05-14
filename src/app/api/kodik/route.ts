@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = "edge";
+
 export async function GET(req: NextRequest) {
   const token = process.env.KODIK_API_KEY || process.env.NEXT_PUBLIC_KODIK_API_KEY;
   if (!token) return NextResponse.json({ error: "Missing KODIK_API_KEY or NEXT_PUBLIC_KODIK_API_KEY" }, { status: 500 });
