@@ -1,84 +1,82 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+function AnimeCard({ anime }: { anime: any }) {
+  const poster = anime?.material_data?.poster_url;
+  const title = anime?.title || anime?.material_data?.title || "Без названия";
+  const score = anime?.material_data?.shikimori_rating || anime?.material_data?.score || "—";
+  const episodes = anime?.material_data?.episodes_total || anime?.material_data?.episodes_aired || anime?.episodes_count || "?";
+
+  return (
+    <a href={`/anime/${anime?.shikimori_id}`} className="group rounded-2xl overflow-hidden bg-moon-900/60 border border-moon-800/60 hover:border-lunar/40 hover:-translate-y-1 transition-all duration-300">
+      <div className="aspect-3/4 bg-moon-800">{poster ? <img src={poster} alt={title} className="w-full h-full object-cover" /> : null}</div>
+      <div className="p-3">
+        <h3 className="text-sm text-moon-100 font-semibold line-clamp-2">{title}</h3>
+        <p className="text-xs text-moon-300 mt-1">⭐ {score} · Эпизоды: {episodes}</p>
+      </div>
+    </a>
+  );
+}
+
+function GridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <div key={i} className="rounded-2xl bg-moon-900/60 border border-moon-800/60 animate-pulse">
+          <div className="aspect-3/4 bg-moon-800" />
+          <div className="p-3 space-y-2"><div className="h-4 bg-moon-800 rounded" /><div className="h-3 bg-moon-800 rounded w-2/3" /></div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function Home() {
-  const [animes, setAnimes] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_KODIK_API_KEY;
-    if (!apiKey) {
-      setError("API ключ не найден! Добавьте NEXT_PUBLIC_KODIK_API_KEY в .env.local");
-      return;
-    }
-    fetch(`https://kodikapi.com/list?token=${apiKey}&limit=20&order=shikimori_rating&sort=desc`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.error) {
-          setError(`Ошибка API: ${data.error}`);
-        } else {
-          setAnimes(data.results ?? []);
-        }
-      })
-      .catch((e) => setError(`Ошибка запроса: ${e.message}`));
+    (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch("/api/kodik?type=list&limit=20&order=shikimori_rating&sort=desc");
+        const data: any = await res.json();
+        if (!res.ok || data?.error) throw new Error(data?.error || "Ошибка загрузки списка");
+        setItems(data?.results || []);
+      } catch (e: any) {
+        setError(e?.message || "Ошибка сети");
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (query.trim().length < 2) return setSuggestions([]);
+      try {
+        const res = await fetch(`/api/kodik?type=search&title=${encodeURIComponent(query)}&limit=8`);
+        const data: any = await res.json();
+        setSuggestions(data?.results || []);
+      } catch {
+        setSuggestions([]);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const shown = useMemo(() => (query.trim() ? suggestions : items), [query, suggestions, items]);
 
   return (
     <main className="container mx-auto px-4 py-8">
-      <nav className="flex items-center justify-between py-4 border-b border-moon-800/50">
-        <h1 className="text-2xl font-bold bg-linear-to-r from-lunar to-lunar-glow bg-clip-text text-transparent">
-          🌙 AniLuna
-        </h1>
-        <div className="flex gap-6 text-moon-300">
-          <a href="/catalog" className="hover:text-lunar transition-colors">Каталог</a>
-          <a href="/ongoing" className="hover:text-lunar transition-colors">Онгоинги</a>
-          <a href="/popular" className="hover:text-lunar transition-colors">Популярное</a>
-        </div>
-      </nav>
-
-      <section className="mt-8 rounded-2xl bg-linear-to-r from-moon-800/60 to-moon-900/60 border border-moon-700/30 p-8 backdrop-blur-sm">
-        <h2 className="text-4xl font-bold text-lunar-glow">Смотри аниме. Без ограничений.</h2>
-        <p className="mt-2 text-moon-300">Тысячи тайтлов, озвучка, субтитры — всё в одном месте</p>
-      </section>
-
-      {error && (
-        <div className="mt-6 p-4 rounded-xl bg-red-900/30 border border-red-500/30 text-red-300">
-          ⚠️ {error}
-        </div>
-      )}
-
-      <section className="mt-10">
-        <h3 className="text-xl font-semibold text-lunar mb-4">🔥 Популярное</h3>
-        {animes.length === 0 && !error && (
-          <p className="text-moon-400">Загрузка...</p>
-        )}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {animes.map((anime: any) => {
-            const poster = anime.material_data?.poster_url;
-            const title = anime.title || anime.material_data?.title || "Без названия";
-            const score = anime.material_data?.score || "—";
-            const episodes = anime.material_data?.episodes || "?";
-            const animeType = anime.type || "TV";
-            return (
-              <a key={anime.id} href={`/anime/${anime.shikimori_id}`}
-                className="group cursor-pointer rounded-xl overflow-hidden bg-moon-900/50 border border-moon-800/40 hover:border-lunar/30 hover:shadow-lg hover:shadow-moon-500/10 transition-all duration-300">
-                <div className="aspect-3/4 bg-moon-800 relative overflow-hidden">
-                  {poster && <img src={poster} alt={title} className="w-full h-full object-cover" />}
-                  <div className="absolute inset-0 bg-linear-to-t from-moon-950/80 to-transparent" />
-                  <div className="absolute bottom-2 left-2">
-                    <span className="text-xs bg-moon-500/80 px-2 py-0.5 rounded-full">{animeType}</span>
-                  </div>
-                </div>
-                <div className="p-3">
-                  <h4 className="text-sm font-medium text-moon-100 group-hover:text-lunar transition-colors line-clamp-2">{title}</h4>
-                  <p className="text-xs text-moon-400 mt-1">⭐ {score} • Эпизоды: {episodes}</p>
-                </div>
-              </a>
-            );
-          })}
-        </div>
-      </section>
+      <nav className="flex flex-wrap gap-3 items-center justify-between py-4 border-b border-moon-800/50"><h1 className="text-2xl font-bold bg-linear-to-r from-lunar to-lunar-glow bg-clip-text text-transparent">🌙 AniLuna</h1><div className="flex gap-5 text-moon-300 text-sm md:text-base"><a href="/catalog" className="hover:text-lunar">Каталог</a><a href="/ongoing" className="hover:text-lunar">Онгоинги</a><a href="/popular" className="hover:text-lunar">Популярное</a></div></nav>
+      <section className="mt-6"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск по названию..." className="w-full rounded-xl bg-moon-900/70 border border-moon-700/50 px-4 py-3" /></section>
+      {error ? <div className="mt-6 p-4 rounded-xl bg-red-900/20 border border-red-500/40 text-red-300">⚠️ {error}</div> : null}
+      <section className="mt-8"><h2 className="text-xl font-semibold text-lunar mb-4">🔥 Популярное</h2>{loading ? <GridSkeleton /> : <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">{shown.map((anime: any) => <AnimeCard key={anime?.id || anime?.link} anime={anime} />)}</div>}</section>
     </main>
   );
 }
