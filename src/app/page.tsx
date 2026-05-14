@@ -16,6 +16,37 @@ function AnimeCard({ anime }: { anime: any }) {
 }
 
 function GridSkeleton() { return <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">{Array.from({ length: 12 }).map((_, i) => <div key={i} className="rounded-2xl bg-moon-900/60 border border-moon-800/60 animate-pulse"><div className="aspect-3/4 bg-moon-800" /><div className="p-3 space-y-2"><div className="h-4 bg-moon-800 rounded" /><div className="h-3 bg-moon-800 rounded w-2/3" /></div></div>)}</div>; }
+import { useEffect, useMemo, useState } from "react";
+
+function AnimeCard({ anime }: { anime: any }) {
+  const poster = anime?.material_data?.poster_url;
+  const title = anime?.title || anime?.material_data?.title || "Без названия";
+  const score = anime?.material_data?.shikimori_rating || anime?.material_data?.score || "—";
+  const episodes = anime?.material_data?.episodes_total || anime?.material_data?.episodes_aired || anime?.episodes_count || "?";
+
+  return (
+    <a href={`/anime/${anime?.shikimori_id}`} className="group rounded-2xl overflow-hidden bg-moon-900/60 border border-moon-800/60 hover:border-lunar/40 hover:-translate-y-1 transition-all duration-300">
+      <div className="aspect-3/4 bg-moon-800">{poster ? <img src={poster} alt={title} className="w-full h-full object-cover" /> : null}</div>
+      <div className="p-3">
+        <h3 className="text-sm text-moon-100 font-semibold line-clamp-2">{title}</h3>
+        <p className="text-xs text-moon-300 mt-1">⭐ {score} · Эпизоды: {episodes}</p>
+      </div>
+    </a>
+  );
+}
+
+function GridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      {Array.from({ length: 12 }).map((_, i) => (
+        <div key={i} className="rounded-2xl bg-moon-900/60 border border-moon-800/60 animate-pulse">
+          <div className="aspect-3/4 bg-moon-800" />
+          <div className="p-3 space-y-2"><div className="h-4 bg-moon-800 rounded" /><div className="h-3 bg-moon-800 rounded w-2/3" /></div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function Home() {
   const [items, setItems] = useState<any[]>([]);
