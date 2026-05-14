@@ -1,5 +1,10 @@
 {
-	"files.associations": {
-		"wrangler.json": "jsonc"
-	}
+  "css.lint.unknownAtRules": "ignore",
+  "tailwindCSS.includeLanguages": {
+    "typescript": "javascript",
+    "typescriptreact": "javascript"
+  },
+  "editor.quickSuggestions": {
+    "strings": "on"
+  }
 }
