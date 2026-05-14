@@ -1,65 +1,96 @@
 "use client";
 
-import { useState, useEffect } from "react";
+export const runtime = "edge";
+
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
 export default function AnimePage() {
   const { id } = useParams();
-  const [anime, setAnime] = useState<any>(null);
+  const apiKey = process.env.NEXT_PUBLIC_KODIK_API_KEY;
+  const [variants, setVariants] = useState<any[]>([]);
+  const [selected, setSelected] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_KODIK_API_KEY;
-    if (!apiKey || !id) return;
-    fetch(`https://kodikapi.com/search?token=${apiKey}&shikimori_id=${id}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setAnime(data.results?.[0] || null);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    const key = `aniluna_saved_${id}`;
+    setSaved(localStorage.getItem(key) === "1");
   }, [id]);
 
-  const title = anime?.title || anime?.material_data?.title || "Аниме";
-  const description = anime?.material_data?.description || "";
-  const poster = anime?.material_data?.poster_url || "";
-  const link = anime?.link || "";
-  const playerUrl = link ? (link.startsWith("//") ? `https:${link}` : link) : "";
+  useEffect(() => {
+    const load = async () => {
+      if (!apiKey || !id) return;
+      try {
+        setLoading(true);
+        const res = await fetch(`https://kodikapi.com/search?token=${apiKey}&shikimori_id=${id}`);
+        const data: any = await res.json();
+        if (!res.ok || data?.error) throw new Error(data?.error || "Ошибка загрузки тайтла");
+        setVariants(data?.results || []);
+      } catch (e: any) {
+        setError(e?.message || "Ошибка сети");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [apiKey, id]);
 
-  if (loading) {
-    return (
-      <main className="container mx-auto px-4 py-8">
-        <p className="text-moon-400">Загрузка...</p>
-      </main>
-    );
-  }
+  const anime = variants[selected] || variants[0] || null;
+  const title = anime?.title || anime?.material_data?.title || "Аниме";
+  const description = anime?.material_data?.description || "Описание отсутствует.";
+  const playerUrl = anime?.link ? (anime.link.startsWith("//") ? `https:${anime.link}` : anime.link) : "";
+  const episodes = anime?.episodes_count || anime?.material_data?.episodes_total || anime?.material_data?.episodes_aired || 0;
+
+  const seasons = useMemo(() => Array.from(new Set(variants.map((v: any) => v?.season).filter(Boolean))), [variants]);
+
+  const toggleSaved = () => {
+    const key = `aniluna_saved_${id}`;
+    const next = !saved;
+    setSaved(next);
+    localStorage.setItem(key, next ? "1" : "0");
+  };
+
+  if (loading) return <main className="container mx-auto px-4 py-8 text-moon-300">Загрузка...</main>;
+  if (error) return <main className="container mx-auto px-4 py-8 text-red-300">{error}</main>;
 
   return (
-    <main className="container mx-auto px-4 py-8">
-      <a href="/" className="text-lunar hover:text-lunar-glow transition-colors">← Назад</a>
-      <div className="mt-6 flex flex-col lg:flex-row gap-8">
-        <div className="flex-1">
-          <div className="rounded-xl overflow-hidden border border-moon-800/40 bg-moon-950">
-            {playerUrl ? (
-              <iframe src={playerUrl} className="w-full aspect-video" allowFullScreen allow="autoplay; fullscreen" />
-            ) : (
-              <div className="w-full aspect-video flex items-center justify-center text-moon-400">Плеер недоступен</div>
-            )}
-          </div>
+    <main className="w-full min-h-screen px-3 md:px-8 py-6">
+      <a href="/" className="text-lunar hover:text-lunar-glow">← На главную</a>
+      <section className="mt-4 rounded-2xl overflow-hidden border border-moon-700/40 bg-moon-950">
+        {playerUrl ? <iframe src={playerUrl} className="w-full h-[50vh] md:h-[70vh]" allowFullScreen allow="autoplay; fullscreen" /> : <div className="h-[50vh] flex items-center justify-center">Плеер недоступен</div>}
+      </section>
+
+      <section className="grid lg:grid-cols-[280px_1fr] gap-6 mt-6">
+        <div>
+          {anime?.material_data?.poster_url ? <img src={anime.material_data.poster_url} alt={title} className="w-full rounded-xl border border-moon-800/50" /> : null}
+          <button onClick={toggleSaved} className="mt-3 w-full rounded-xl bg-moon-800 hover:bg-moon-700 transition-colors px-4 py-2">{saved ? "★ В избранном" : "☆ Смотреть позже / В избранное"}</button>
         </div>
-        <div className="lg:w-80">
-          {poster && <img src={poster} alt={title} className="w-full rounded-xl border border-moon-800/40" />}
-          <h1 className="text-2xl font-bold text-lunar-glow mt-4">{title}</h1>
-          {description && <p className="text-moon-300 text-sm mt-2">{description}</p>}
-          {anime?.material_data?.anime_genre && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              {anime.material_data.anime_genre.map((g: string) => (
-                <span key={g} className="text-xs bg-moon-800/60 text-moon-200 px-2 py-1 rounded-full">{g}</span>
-              ))}
+        <div>
+          <h1 className="text-3xl font-bold text-lunar-glow">{title}</h1>
+          <p className="text-moon-300 mt-3">{description}</p>
+          <p className="text-moon-300 mt-3">Статус: {anime?.material_data?.anime_status || "—"} · Рейтинг: {anime?.material_data?.shikimori_rating || anime?.material_data?.score || "—"}</p>
+          <div className="flex flex-wrap gap-2 mt-3">{(anime?.material_data?.anime_genre || []).map((g: string) => <span key={g} className="text-xs bg-moon-800/60 rounded-full px-2 py-1">{g}</span>)}</div>
+
+          {variants.length > 1 ? (
+            <div className="mt-5 grid md:grid-cols-2 gap-3">
+              <select value={selected} onChange={(e) => setSelected(Number(e.target.value))} className="rounded-xl bg-moon-900/70 border border-moon-700/50 px-3 py-2">
+                {variants.map((v: any, idx: number) => <option key={`${v?.id}_${idx}`} value={idx}>{v?.translation?.title || v?.title || `Вариант ${idx + 1}`}</option>)}
+              </select>
+              <select className="rounded-xl bg-moon-900/70 border border-moon-700/50 px-3 py-2" value={anime?.season || ""} onChange={(e) => {
+                const idx = variants.findIndex((v: any) => String(v?.season || "") === e.target.value);
+                if (idx >= 0) setSelected(idx);
+              }}>
+                <option value="">Сезон</option>
+                {seasons.map((s: any) => <option key={String(s)} value={String(s)}>{String(s)}</option>)}
+              </select>
             </div>
-          )}
+          ) : null}
+
+          {Number(episodes) > 1 ? <p className="mt-4 text-moon-200">Список эпизодов: доступно {episodes} серий в плеере Kodik.</p> : null}
         </div>
-      </div>
+      </section>
     </main>
   );
 }
